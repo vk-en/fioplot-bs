@@ -49,7 +49,7 @@ git clone https://github.com/vk-en/fioplot-bs.git
 
 cd fioplot-bs
 
-go build -o fioplot-bs fioplot-bs.go
+go build -v
 
 ./fioplot-bs -h
 ```
@@ -67,13 +67,36 @@ fio /fio_config.cfg --output-format=normal,json --output=TestA.json
 
 Further, when the results are already available, you can put them in one directory and specify this directory in fioplot-bs as the directory where the results are stored in the form of JSON (For example: --path=/home/fioResults/).
 
+Expected file tree for the directory with FIO results from which graphs/charts and reports will be built:
+
 ```bash
 ls -l /home/fioResults/
 > -rw-r--r--  1 user  staff  899793 Apr  7 07:18 TestA.json
 > -rw-r--r--  1 user  staff  899234 Apr  7 09:10 TestB.json
 > -rw-r--r--  1 user  staff  812257 Apr  7 11:20 TestC.json
+> drwxr-xr-x 87 user  staff    2784 Apr 29 17:49 LogsTestA
+> drwxr-xr-x 87 user  staff    2784 Apr 29 17:49 LogsTestB
+> drwxr-xr-x 87 user  staff    2784 Apr 29 17:49 LogsTestC
+```
 
-./fioplot-bs --name=MyFirstTest --path=/home/fioResults
+Where the logs directories looks something like this:
+
+```bash
+ls -l /home/fioResults/
+
+> -rw-r--r--  1 user  staff  14658 Dec 13  2021 write-64k-0_bw.376.log
+> -rw-r--r--  1 user  staff  15219 Dec 13  2021 write-64k-0_clat.376.log
+> -rw-r--r--  1 user  staff  13221 Dec 13  2021 write-64k-0_iops.376.log
+> -rw-r--r--  1 user  staff  15220 Dec 13  2021 write-64k-0_lat.376.log
+> -rw-r--r--  1 user  staff  13959 Dec 13  2021 write-64k-0_slat.376.log
+...
+
+```
+
+**fioplot-bs usage example:**
+
+```bash
+./fioplot-bs --name=MyFirstTest --path=/home/fioResults --loggraphs
 ```
 
 Where:
@@ -81,6 +104,8 @@ Where:
 - --name - Specifies the common name of the test (Ex. Comparison-of-market-storage-leaders). Specified without spaces. And serves as the name of the directory where the results will be generated
 
 - --path - The directory where you put the results from different tests as JSON files. (The extension must also be \*.json)
+
+- --loggraphs - The flag for creating graphs from log files. If you don't have logging files, don't specify it.
 
 Upon successful completion, a directory with results will appear with the following hierarchy:
 
@@ -91,7 +116,13 @@ MyFirstTest
 --------...
 ----csv-tables
 --------...
+----log-graphs
+--------...
 ```
+
+**Random sample from graph and charts for example:**
+
+<a href="https://svgshare.com/i/ihA.svg"><p align="left"><img width="950" src="https://svgshare.com/i/ihA.svg" alt="fioplot-bs example"></p></a>
 
 You can also see the entire list of available options and commands by running the command:
 
@@ -118,12 +149,25 @@ package main
 
 import (
     "fmt"
+    "strings"
 
     "github.com/vk-en/fioplot-bs/pkg/barchart"
+    "github.com/vk-en/fioplot-bs/pkg/csvtable"
 )
 
 func main() {
-    var csvFiles []string{"TestA.csv", "TestB.csv", "TestC.csv"}
+    var csvFiles []string
+    var jsonFiles []string{"TestA.json", "TestB.json", "TestC.json"}
+
+    for _, json := range jsonFiles {
+        csvFileName := strings.Replace(json, ".json", ".csv", -1)
+	    if err := csvtable.ConvertJSONtoCSV(json, csvFileName); err != nil {
+            fmt.Println(err)
+		    return
+	    }
+        csvFiles = append(csvFiles, csvFileName)
+    }
+
     if err := barchart.CreateBarCharts(csvFiles, "MyFirstBarCharts", "/home/MyReport/", "svg"); err != nil {
         fmt.Printf("could not create barCharts.\n Error: %v\n", err)
     } else {
