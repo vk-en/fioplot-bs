@@ -181,7 +181,9 @@ func CreateBarCharts(csvFiles []string, descriptionForCharts, pathForResults, im
 	}
 
 	for _, file := range csvFiles {
-		testResults.ParsingCSVfile(file)
+		if err := testResults.ParsingCSVfile(file); err != nil {
+			return fmt.Errorf("parsing csv file [%s] failed! err:%v", file, err)
+		}
 	}
 
 	identicalPatterns, err := data.GetIdenticalPatterns(testResults)

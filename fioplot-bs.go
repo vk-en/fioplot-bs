@@ -10,15 +10,17 @@ import (
 	"github.com/jessevdk/go-flags"
 	bar "github.com/vk-en/fioplot-bs/pkg/barchart"
 	csv "github.com/vk-en/fioplot-bs/pkg/csvtable"
+	log "github.com/vk-en/fioplot-bs/pkg/loggraphs"
 	xlsx "github.com/vk-en/fioplot-bs/pkg/xlsxchart"
 )
 
 // Options - command line arguments
 type Options struct {
-	TestName      string `short:"n" long:"name" description:"Name for folder with results" required:"true"`
-	PathToFioJson string `short:"p" long:"path" description:"Full path to JSON files with FIO results (Ex. /home/user/dirWithresults)" required:"true"`
-	ImgFormat     string `short:"f" long:"format" description:"Format of an images with charts (eps, jpg, jpeg, pdf, png, svg, tex, tif and tiff)" default:"svg"`
-	Description   string `short:"d" long:"description" description:"Description for image results" default:"github.com/vk-en/fioplot-bs"`
+	TestName    string `short:"n" long:"name" description:"Name for folder with results" required:"true"`
+	Catalog     string `short:"c" long:"catalog" description:"Full path to catalog with *.json files and/or catalogs with *.log results (Ex. /home/user/dirWithResults)" required:"true"`
+	ImgFormat   string `short:"f" long:"format" description:"Format of an images with charts" default:"svg" choice:"eps" choice:"jpg" choice:"jpeg" choice:"pdf" choice:"png" choice:"svg" choice:"tex" choice:"tif" choice:"tiff"`
+	Description string `short:"d" long:"description" description:"Description for image results" default:"github.com/vk-en/fioplot-bs"`
+	LogGraphs   bool   `short:"l" long:"loggraphs" description:"Create log graphs" optionalArgument:"true"`
 }
 
 const (
@@ -49,7 +51,7 @@ func argparse() {
 // createFolderForResults - if folder already exists create new folder with new name
 func createFolderForResults(folderName string) (string, error) {
 	curentlyPath, _ := os.Getwd()
-	fullPath := fmt.Sprintf("%s/%s", curentlyPath, folderName)
+	fullPath := filepath.Join(curentlyPath, folderName)
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		if err := os.Mkdir(fullPath, 0755); err != nil {
 			return "", err
@@ -127,7 +129,13 @@ func makeResults() error {
 		return fmt.Errorf("could not create folder for results: %w", err)
 	}
 
-	jsonFiles, err = checkFolderWithJSONfiles(opts.PathToFioJson)
+	if opts.LogGraphs {
+		if err := log.CreateGraphsFromLogs(pathToResults, opts.Catalog, opts.Description, opts.ImgFormat); err != nil {
+			return fmt.Errorf("could not create graphs from logs: %w", err)
+		}
+	}
+
+	jsonFiles, err = checkFolderWithJSONfiles(opts.Catalog)
 	if err != nil {
 		cleanUpDir()
 		return err

@@ -87,13 +87,13 @@ func (t *AllResults) ParsingCSVfile(fullPathToCsv string) error {
 	var groupFile = make(GroupTestRes, 0)
 	csvFile, err := os.Open(fullPathToCsv)
 	if err != nil {
-		fmt.Println(err)
+		return fmt.Errorf("error: %v", err)
 	}
 	defer csvFile.Close()
 
 	reader, err := csv.NewReader(csvFile).ReadAll()
 	if err != nil {
-		fmt.Println(err)
+		return fmt.Errorf("error: %v", err)
 	}
 
 	for iter, line := range reader {
