@@ -31,9 +31,9 @@ on the results of the performance testing utility - [FIO](https://fio.readthedoc
 4. Draws graphs and charts in various formats.
 
    > At the moment, graphs and charts can be created in the following formats:
-   > .jpg, .jpeg, .pdf, .png, .svg, .tex, .tif and .tiff
+   > `.jpg`, `.jpeg`, `.pdf`, `.png`, `.svg`, `.tex`, `.tif` and `.tiff`
 
-5. Able to generate reports with a graphical representation in the form of xslx tables.
+5. Able to generate reports with a graphical representation in the form of xlsx tables.
    > This is done for the convenience of uploading results to cloud storages, such as google drive. Such a report has a separate page for each type (Performance, IOPS, Latency, and so on), as well as a separate page with graphs from data from all pages.
 
 ## How it works
@@ -57,13 +57,13 @@ go build -v
 ### Example usage
 
 Before you need this utility, you need to perform the required testing using the FIO utility.
-For this test, you need to run the FIO command with the options: **--output-format=normal,json --output=TestA.json** or just **--output-format=json --output=TestB.json**. For example:
+For this test, you need to run the FIO command with the options: `--output-format=normal,json --output=TestA.json` or just `--output-format=json --output=TestB.json`. For example:
 
 ```bash
 fio /fio_config.cfg --output-format=normal,json --output=TestA.json
 ```
 
-> Where /fio_config.cfg this is configuration for tests. How to create test configurations for FIO can be [found here](https://fio.readthedocs.io/en/latest/fio_doc.html#job-file-format).
+> Where `/fio_config.cfg` this is configuration for tests. How to create test configurations for FIO can be [found here](https://fio.readthedocs.io/en/latest/fio_doc.html#job-file-format).
 
 Further, when the results are already available, you can put them in one directory and specify this directory in fioplot-bs as the directory where the results are stored in the form of JSON (For example: --path=/home/fioResults/).
 
@@ -101,23 +101,23 @@ ls -l /home/fioResults/
 
 Where:
 
-- --name - Specifies the common name of the test (Ex. Comparison-of-market-storage-leaders). Specified without spaces. And serves as the name of the directory where the results will be generated
+- `--name` - Specifies the common name of the test (Ex. `Comparison-of-market-storage-leaders`). Specified **without** spaces. And serves as the name of the directory where the results will be generated
 
-- --path - The directory where you put the results from different tests as JSON files. (The extension must also be \*.json)
+- `--path` - The directory where you put the results from different tests as JSON files. (The extension must also be `*.json`)
 
-- --loggraphs - The flag for creating graphs from log files. If you don't have logging files, don't specify it.
+- `--loggraphs` - The flag for creating graphs from log files. If you don't have logging files, don't specify it.
 
 Upon successful completion, a directory with results will appear with the following hierarchy:
 
 ```text
-MyFirstTest
-----MyFirstTest.xlsx
-----bar-charts
---------...
-----csv-tables
---------...
-----log-graphs
---------...
+MyFirstTest/
+├── bar-charts
+│   └── ...
+├── csv-tables
+│   └── ...
+├── log-graphs
+│   └── ...
+└── MyFirstTest.xlsx
 ```
 
 **Random sample from graph and charts for example:**
