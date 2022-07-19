@@ -65,7 +65,7 @@ fio /fio_config.cfg --output-format=normal,json --output=TestA.json
 
 > Where `/fio_config.cfg` this is configuration for tests. How to create test configurations for FIO can be [found here](https://fio.readthedocs.io/en/latest/fio_doc.html#job-file-format).
 
-Further, when the results are already available, you can put them in one directory and specify this directory in fioplot-bs as the directory where the results are stored in the form of JSON (For example: --path=/home/fioResults/).
+Further, when the results are already available, you can put them in one directory and specify this directory in fioplot-bs as the directory where the results are stored in the form of JSON (For example: --catalog=/home/fioResults/).
 
 Expected file tree for the directory with FIO results from which graphs/charts and reports will be built:
 
@@ -82,7 +82,7 @@ ls -l /home/fioResults/
 Where the logs directories looks something like this:
 
 ```bash
-ls -l /home/fioResults/
+ls -l /home/fioResults/LogsTestA
 
 > -rw-r--r--  1 user  staff  14658 Dec 13  2021 write-64k-0_bw.376.log
 > -rw-r--r--  1 user  staff  15219 Dec 13  2021 write-64k-0_clat.376.log
@@ -96,14 +96,14 @@ ls -l /home/fioResults/
 **fioplot-bs usage example:**
 
 ```bash
-./fioplot-bs --name=MyFirstTest --path=/home/fioResults --loggraphs
+./fioplot-bs --name=MyFirstTest --catalog=/home/fioResults --loggraphs
 ```
 
 Where:
 
 - `--name` - Specifies the common name of the test (Ex. `Comparison-of-market-storage-leaders`). Specified **without** spaces. And serves as the name of the directory where the results will be generated
 
-- `--path` - The directory where you put the results from different tests as JSON files. (The extension must also be `*.json`)
+- `--catalog` - The directory where you put the results from different tests as JSON files and folders with logs(if have). (The extension must also be `*.json`)
 
 - `--loggraphs` - The flag for creating graphs from log files. If you don't have logging files, don't specify it.
 
@@ -161,10 +161,10 @@ func main() {
 
     for _, json := range jsonFiles {
         csvFileName := strings.Replace(json, ".json", ".csv", -1)
-	    if err := csvtable.ConvertJSONtoCSV(json, csvFileName); err != nil {
+        if err := csvtable.ConvertJSONtoCSV(json, csvFileName); err != nil {
             fmt.Println(err)
-		    return
-	    }
+        return
+        }
         csvFiles = append(csvFiles, csvFileName)
     }
 
