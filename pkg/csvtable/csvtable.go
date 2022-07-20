@@ -117,7 +117,7 @@ func mbps(x int) float64 {
 // formatCSV formats CSV input
 func formatCSV(in fioJSON, to io.Writer) error {
 	var header = []string{
-		"Group ID", "Pattern", "Block Size", "IO Depth", "Jobs",
+		"Job Name", "Group ID", "Pattern", "Block Size", "IO Depth", "Jobs",
 		"MB/s", "BWMim (MB/s)", "BWMax (MB/s)", "IOPS min", "IOPS max",
 		"Latency Min (ms)", "Latency Max (ms)", "Latency stddev (ms)",
 		"cLatency p99 (ms)",
@@ -151,6 +151,7 @@ func formatCSV(in fioJSON, to io.Writer) error {
 			cLatNsPercent = float64(v.Read.ClatNS.Percentile["99.000000"]) / 1000000
 		}
 		var row = []string{
+			v.TestName,
 			fmt.Sprintf("%v", v.GroupID),
 			v.TestOption.RW,
 			v.TestOption.BS,

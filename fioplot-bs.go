@@ -18,7 +18,7 @@ import (
 type Options struct {
 	TestName    string `short:"n" long:"name" description:"Name for folder with results" required:"true"`
 	Catalog     string `short:"c" long:"catalog" description:"Full path to catalog with *.json files and/or catalogs with *.log results (Ex. /home/user/dirWithResults)" required:"true"`
-	ImgFormat   string `short:"f" long:"format" description:"Format of an images with charts" default:"svg" choice:"eps" choice:"jpg" choice:"jpeg" choice:"pdf" choice:"png" choice:"svg" choice:"tex" choice:"tif" choice:"tiff"`
+	ImgFormat   string `short:"f" long:"format" description:"Format of an images with charts" default:"png" choice:"png" choice:"svg"`
 	Description string `short:"d" long:"description" description:"Description for image results" default:"github.com/vk-en/fioplot-bs"`
 	LogGraphs   bool   `short:"l" long:"loggraphs" description:"Create log graphs" optionalArgument:"true"`
 }
@@ -135,7 +135,7 @@ func makeResults() error {
 		}
 	}
 
-	jsonFiles, err = checkFolderWithJSONfiles(opts.Catalog)
+ 	jsonFiles, err = checkFolderWithJSONfiles(opts.Catalog)
 	if err != nil {
 		cleanUpDir()
 		return err

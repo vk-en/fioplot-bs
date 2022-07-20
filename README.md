@@ -30,8 +30,7 @@ on the results of the performance testing utility - [FIO](https://fio.readthedoc
 
 4. Draws graphs and charts in various formats.
 
-   > At the moment, graphs and charts can be created in the following formats:
-   > `.jpg`, `.jpeg`, `.pdf`, `.png`, `.svg`, `.tex`, `.tif` and `.tiff`
+   > At the moment, graphs and charts can be created in the following formats: `.png` and `.svg`
 
 5. Able to generate reports with a graphical representation in the form of xlsx tables.
    > This is done for the convenience of uploading results to cloud storages, such as google drive. Such a report has a separate page for each type (Performance, IOPS, Latency, and so on), as well as a separate page with graphs from data from all pages.
