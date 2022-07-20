@@ -13,6 +13,7 @@ import (
 // GroupResults - struct for group results
 // Curent format CSV: "Group ID", "Pattern", "Block Size", "IO Depth", "Jobs", "Mb/s"
 type GroupResults struct {
+	JobName		string
 	GroupID     string
 	Pattern     string
 	Bs          string
@@ -100,21 +101,22 @@ func (t *AllResults) ParsingCSVfile(fullPathToCsv string) error {
 		if iter == 0 {
 			continue
 		}
-		pIopsMin, _ := strconv.Atoi(line[8])
-		pIopsMax, _ := strconv.Atoi(line[9])
-		pLatMin, _ := strconv.ParseFloat(line[10], 64)
-		pLatMax, _ := strconv.ParseFloat(line[11], 64)
-		pLatStd, _ := strconv.ParseFloat(line[12], 64)
-		pLatP, _ := strconv.ParseFloat(line[13], 64)
+		pIopsMin, _ := strconv.Atoi(line[9])
+		pIopsMax, _ := strconv.Atoi(line[10])
+		pLatMin, _ := strconv.ParseFloat(line[11], 64)
+		pLatMax, _ := strconv.ParseFloat(line[12], 64)
+		pLatStd, _ := strconv.ParseFloat(line[13], 64)
+		pLatP, _ := strconv.ParseFloat(line[14], 64)
 		resultOneGroup := GroupResults{
-			GroupID:     line[0],
-			Pattern:     line[1],
-			Bs:          line[2],
-			Depth:       line[3],
-			JobsCount:   line[4],
-			Performance: line[5],
-			BwMin:       line[6],
-			BwMax:       line[7],
+			JobName:	 line[0],
+			GroupID:     line[1],
+			Pattern:     line[2],
+			Bs:          line[3],
+			Depth:       line[4],
+			JobsCount:   line[5],
+			Performance: line[6],
+			BwMin:       line[7],
+			BwMax:       line[8],
 			IopsMin:     pIopsMin,
 			IopsMax:     pIopsMax,
 			LatMin:      pLatMin,
@@ -124,7 +126,7 @@ func (t *AllResults) ParsingCSVfile(fullPathToCsv string) error {
 		}
 		group := TestResult{
 			GroupRes: resultOneGroup,
-			Pattern: fmt.Sprintf("%s-%s d=%s j=%s",
+			Pattern: fmt.Sprintf("%s-%s d=%s j=%s", //change on only JobName later when will add more info in legend
 				resultOneGroup.Pattern,
 				resultOneGroup.Bs,
 				resultOneGroup.Depth,

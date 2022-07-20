@@ -13,11 +13,18 @@ import (
 	"strconv"
 	"strings"
 
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/font"
-	"gonum.org/v1/plot/plotter"
-	"gonum.org/v1/plot/plotutil"
-	"gonum.org/v1/plot/vg"
+	"github.com/wcharczuk/go-chart/v2"
+	"github.com/wcharczuk/go-chart/v2/drawing"
+)
+
+const (
+	LogChartWidth = 1920
+	LogChartHeight = 1080
+	LogChartPaddingTop = 80
+	LogChartPaddingLeft = 50
+	LogChartPaddingRight = 50
+	LogChartPaddingBottom = 150
+	LogChartIndentLegend = LogChartHeight - LogChartPaddingBottom + 30
 )
 
 // Logs have line from fio bw/IOPS/latency log file.  (Example: 15, 204800, 0, 0);
@@ -116,43 +123,6 @@ func (t *LogFile) parsingLogfile(filePath string) error {
 	return nil
 }
 
-//plotCreate - сreates a skeleton for plotting graphs
-func plotCreate(testName, typeVolume, description string, xMax float64) (*plot.Plot, error) {
-	p := plot.New()
-	p.Title.Text = testName
-	p.Title.TextStyle.Font.Size = font.Length(20)
-	p.Y.Label.Text = typeVolume
-	p.Y.Label.Padding = 10
-	p.X.Label.Text = description
-	p.X.Label.TextStyle.Font.Size = font.Length(10)
-	p.X.Label.Padding = 25
-	p.Legend.Top = true
-	p.Legend.YOffs = vg.Length(+40)
-	p.Legend.XOffs = vg.Length(-20)
-	p.Legend.Padding = 2
-	p.X.Max = xMax
-	p.Title.Padding = 40
-	p.X.Tick.Width = 0
-	p.X.Tick.Length = 0
-	p.X.Width = 0
-	p.Add(plotter.NewGrid())
-	return p, nil
-}
-
-// getPoints - Get values for the x-axis
-func getPoints(data LogFile, logType int) plotter.XYs {
-	pts := make(plotter.XYs, len(data))
-	for i, point := range data {
-		pts[i].X = float64(i)
-		if logType == 1 {
-			pts[i].Y = mbps(point.value)
-		} else {
-			pts[i].Y = float64(point.value)
-		}
-	}
-	return pts
-}
-
 //getInfoAboutLogFile   return: fileType (1-bw,2-iops,3-lat), Y-name, test Name, error
 func getInfoAboutLogFile(fileName string) (int, string, string, error) {
 	testName := strings.Split(fileName, ".")
@@ -176,92 +146,276 @@ func getInfoAboutLogFile(fileName string) (int, string, string, error) {
 	return 0, "", "", err
 }
 
-// addLinePoints adds Line and Scatter plotters to a
-// plot.  The variadic arguments must be either strings
-// or plotter.XYers.  Each plotter.XYer is added to
-// the plot using the next color, dashes, and glyph
-// shape via the Color, Dashes, and Shape functions.
-// If a plotter.XYer is immediately preceeded by
-// a string then a legend entry is added to the plot
-// using the string as the name.
-//
-// If an error occurs then none of the plotters are added
-// to the plot, and the error is returned.
-func addLinePoints(plt *plot.Plot, vs ...interface{}) error {
-	var ps []plot.Plotter
-	type item struct {
-		name  string
-		value [2]plot.Thumbnailer
+func styleDefaultsSeries(c *chart.Chart, seriesIndex int) chart.Style {
+	return chart.Style{
+		DotColor:    c.GetColorPalette().GetSeriesColor(seriesIndex),
+		StrokeColor: c.GetColorPalette().GetSeriesColor(seriesIndex),
+		StrokeWidth: chart.DefaultSeriesLineWidth,
+		Font:        c.GetFont(),
+		FontSize:    chart.DefaultFontSize,
 	}
-	var items []item
-	name := ""
-	var i int
-	for _, v := range vs {
-		switch t := v.(type) {
-		case string:
-			name = t
+}
 
-		case plotter.XYer:
-			l, s, err := plotter.NewLinePoints(t)
-			if err != nil {
-				return err
-			}
-			l.Color = plotutil.Color(2)
-			l.Dashes = plotutil.Dashes(0)
-			l.StepStyle = plotter.NoStep
-			s.Color = plotutil.Color(10)
-			s.Shape = nil
-			i++
-			ps = append(ps, l, s)
-			if name != "" {
-				items = append(items, item{name: name, value: [2]plot.Thumbnailer{l, s}})
-				name = ""
-			}
-
-		default:
-			return fmt.Errorf("plotutil: AddLinePoints handles strings and plotter.XYers, got %T", t)
+// getPoints - Get values for the x-axis
+func getPoints(data LogFile, logType int) ([]float64, []float64) {
+	var xPoints []float64
+	var yPoints []float64
+	for _, point := range data {
+		xPoints = append(xPoints,float64(point.time/1000)) // convert to seconds
+		if logType == 1 {
+			yPoints = append(yPoints, mbps(point.value))
+		} else {
+			yPoints = append(yPoints, float64(point.value))
 		}
 	}
-	plt.Add(ps...)
-	for _, item := range items {
-		v := item.value[:]
-		plt.Legend.Add(item.name, v[0], v[1])
-	}
-	return nil
+	return xPoints, yPoints
 }
 
-// countingSizeLogCanvas - counting size of log canvas
-func countingSizeLogCanvas(countX int) (font.Length, font.Length) {
-	if countX > 30000 {
-		return 400 * vg.Inch, 10 * vg.Inch
-	} else if countX > 20000 {
-		return 250 * vg.Inch, 7 * vg.Inch
-	} else if countX > 10000 {
-		return 150 * vg.Inch, 7 * vg.Inch
-	} else if countX > 5000 {
-		return 100 * vg.Inch, 7 * vg.Inch
-	} else if countX > 1000 {
-		return 70 * vg.Inch, 7 * vg.Inch
-	} else if countX > 500 {
-		return 35 * vg.Inch, 7 * vg.Inch
-	} else if countX > 100 {
-		return 20 * vg.Inch, 7 * vg.Inch
+
+// drawlegend is a legend that is designed for longer series lists.
+func drawlegend(c *chart.Chart, userDefaults ...chart.Style) chart.Renderable {
+	return func(r chart.Renderer, cb chart.Box, chartDefaults chart.Style) {
+		legendDefaults := chart.Style{
+			FillColor:   drawing.ColorWhite,
+			FontColor:   chart.DefaultTextColor,
+			FontSize:    14.0,
+			StrokeColor: chart.DefaultAxisColor,
+			StrokeWidth: 2.0,
+		}
+
+		var legendStyle chart.Style
+		if len(userDefaults) > 0 {
+			legendStyle = userDefaults[0].InheritFrom(chartDefaults.InheritFrom(legendDefaults))
+		} else {
+			legendStyle = chartDefaults.InheritFrom(legendDefaults)
+		}
+
+		// DEFAULTS
+		legendPadding := chart.Box{
+			Top:    12,
+			Left:   12,
+			Right:  12,
+			Bottom: 12,
+		}
+
+		lineTextGap := 5
+		lineLengthMinimum := 25
+
+		var labels []string
+		var lines []chart.Style
+		for index, s := range c.Series {
+			if !s.GetStyle().Hidden {
+				if _, isAnnotationSeries := s.(chart.AnnotationSeries); !isAnnotationSeries {
+					labels = append(labels, s.GetName())
+					lines = append(lines, s.GetStyle().InheritFrom(styleDefaultsSeries(c, index)))
+				}
+			}
+		}
+
+		legend :=chart.Box{
+			Top: LogChartIndentLegend,
+			Left: 50,
+			// bottom and right will be sized by the legend content + relevant padding.
+		}
+
+		legendContent := chart.Box{
+			Top:    legend.Top + legendPadding.Top,
+			Left:   legend.Left + legendPadding.Left,
+			Right:  legend.Left + legendPadding.Left,
+			Bottom: legend.Top + legendPadding.Top,
+		}
+
+		legendStyle.GetTextOptions().WriteToRenderer(r)
+
+		// measure
+		labelCount := 0
+		for x := 0; x < len(labels); x++ {
+			if len(labels[x]) > 0 {
+				tb := r.MeasureText(labels[x])
+				if labelCount > 0 {
+					legendContent.Bottom += chart.DefaultMinimumTickVerticalSpacing
+				}
+				legendContent.Bottom += tb.Height()
+				right := legendContent.Left + tb.Width() + lineTextGap + lineLengthMinimum
+				legendContent.Right = chart.MaxInt(legendContent.Right, right)
+				labelCount++
+			}
+		}
+
+ 		legend = legend.Grow(legendContent)
+		legend.Right = legendContent.Right + legendPadding.Right
+		legend.Bottom = legendContent.Bottom + legendPadding.Bottom
+
+		chart.Draw.Box(r, legend, legendStyle)
+
+		legendStyle.GetTextOptions().WriteToRenderer(r)
+
+		ycursor := legendContent.Top
+		tx := legendContent.Left
+		legendCount := 0
+		var label string
+		for x := 0; x < len(labels); x++ {
+			label = labels[x]
+			if len(label) > 0 {
+				if legendCount > 0 {
+					ycursor += chart.DefaultMinimumTickVerticalSpacing
+				}
+
+				tb := r.MeasureText(label)
+
+				ty := ycursor + tb.Height()
+				r.Text(label, tx, ty)
+
+				th2 := tb.Height() >> 1
+
+				lx := tx + tb.Width() + lineTextGap
+				ly := ty - th2
+				lx2 := legendContent.Right - legendPadding.Right
+
+				r.SetStrokeColor(lines[x].GetStrokeColor())
+				r.SetStrokeWidth(lines[x].GetStrokeWidth() + 4)
+				r.SetStrokeDashArray(lines[x].GetStrokeDashArray())
+
+				r.MoveTo(lx, ly)
+				r.LineTo(lx2, ly)
+				r.Stroke()
+
+				ycursor += tb.Height()
+				legendCount++
+			}
+		}
 	}
-	return 10 * vg.Inch, 7 * vg.Inch
 }
 
-// createGraphForLog - creates graph for log file
-func (t *LogFile) createGraphForLog(data LogFile, logType int, yName, testName, discription, DirResPath, imgFormat string) error {
-	p, _ := plotCreate(testName, yName, discription, float64(len(data)))
-	err := addLinePoints(p, yName, getPoints(data, logType))
+
+// drawInfo is a legend that is designed for longer series lists.
+func drawInfo(c *chart.Chart, info []string) chart.Renderable {
+	return func(r chart.Renderer, cb chart.Box, chartDefaults chart.Style) {
+		if len(info) == 0 {
+			return
+		}
+
+		place := chart.Box{
+			Top: LogChartIndentLegend,
+			Left: 50 + 190,
+
+		}
+
+		ycursor := place.Top
+		tx := place.Left
+
+		for _, str := range info {
+			kb := r.MeasureText(str)
+			ty := ycursor + kb.Height()
+			r.Text(str, tx, ty)
+
+			th2 := kb.Height() >> 1
+			lx := tx + kb.Width() + 10
+			ly := ty - th2
+			lx2 := place.Left - 2
+
+			r.MoveTo(lx, ly)
+			r.LineTo(lx2, ly)
+			ycursor += kb.Height() + 10
+
+		}
+	}
+}
+
+
+func createGraphForLog(data LogFile, logType int, yName, testName, discription, DirResPath, imgFormat string) error {
+
+	xVal, YVal := getPoints(data, logType)
+	mainSeries := chart.ContinuousSeries{
+		Name:    yName,
+		YValues: YVal,
+		XValues: xVal,
+	}
+
+	smaSeries := &chart.SMASeries{
+		Name: "Average",
+		InnerSeries: mainSeries,
+		Style: chart.Style{
+			StrokeColor: drawing.ColorRed,               // will supercede defaults
+		},
+	}
+
+	graph := chart.Chart{
+		Width: LogChartWidth,
+		Height: LogChartHeight,
+		Title: testName,
+		TitleStyle: chart.Style {
+			FontSize:    30.0,
+		},
+		Background: chart.Style {
+			Padding: chart.Box{
+				Top:  LogChartPaddingTop,
+				Left: LogChartPaddingLeft,
+				Right: LogChartPaddingRight,
+				Bottom: LogChartPaddingBottom,
+			},
+		},
+
+		Series: []chart.Series {
+			mainSeries,
+			smaSeries,
+		},
+
+		YAxis: chart.YAxis {
+			Name: yName,
+			NameStyle: chart.Style{
+				FontSize:    20.0,
+			},
+			Style: chart.Style{
+				FontSize:    15.0,
+			},
+			ValueFormatter: func(v interface{}) string {
+				if vf, isFloat := v.(float64); isFloat {
+					return fmt.Sprintf("%0.0f", vf)
+				}
+				return ""
+			},
+		},
+
+		XAxis: chart.XAxis {
+			Name: "Time in seconds",
+			NameStyle: chart.Style{
+				FontSize:    20.0,
+			},
+			Style: chart.Style{
+				TextRotationDegrees: 45.0,
+				FontSize:    12.5,
+			},
+			ValueFormatter: func(v interface{}) string {
+				if vf, isFloat := v.(float64); isFloat {
+					return fmt.Sprintf("%0.0f  ", vf)
+				}
+				return ""
+			},
+		},
+	}
+
+	graph.Elements = []chart.Renderable{
+		drawlegend(&graph),
+		//drawInfo(&graph, nil), //FIXME: add info
+	}
+
+	logFraphPath := filepath.Join(DirResPath, fmt.Sprintf("%s.%s", testName, imgFormat))
+	f, err := os.Create(logFraphPath)
 	if err != nil {
-		return fmt.Errorf("error with get values for the Y-axis %w", err)
+		return fmt.Errorf("failed to create file %s error: %w", logFraphPath, err)
+	}
+	defer f.Close()
+	if imgFormat == "png" {
+		if err := graph.Render(chart.PNG, f); err != nil {
+			return fmt.Errorf("failed to render log chart: %v", err)
+		}
+	} else {
+		if err := graph.Render(chart.SVG, f); err != nil {
+			return fmt.Errorf("failed to render log chart: %v", err)
+		}
 	}
 
-	width, height := countingSizeLogCanvas(len(data))
-	if err := p.Save(width, height, filepath.Join(DirResPath, fmt.Sprintf("%s.%s", testName, imgFormat))); err != nil {
-		return fmt.Errorf("error with save charts %w", err)
-	}
 	return nil
 }
 
@@ -453,7 +607,7 @@ func CreateGraphsFromLogs(dirWithResults, dirWithLogs, discription, ImgFormat st
 					return fmt.Errorf("could not parse log file: %w", err)
 				}
 
-				if err := logData.createGraphForLog(logData, fType, yName, testName,
+				if err := createGraphForLog(logData, fType, yName, testName,
 					discription, testNameDir, ImgFormat); err != nil {
 					return fmt.Errorf("could not create log graphs: %w", err)
 				}
