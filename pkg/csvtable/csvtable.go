@@ -1,106 +1,13 @@
 package csvtable
 
 import (
-	"bytes"
 	"encoding/csv"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
-
 	"os"
+	bs "github.com/vk-en/fioplot-bs/pkg/bsdata"
 )
-
-// LatNS is a struct for latency in nanoseconds
-type LatNS struct {
-	Min        int64            `json:"min"`
-	Max        int64            `json:"max"`
-	Mean       float64          `json:"mean"`
-	Stddev     float64          `json:"stddev"`
-	Percentile map[string]int64 `json:"percentile,omitempty"`
-}
-
-// fioJSON is a struct for JSON input
-type fioJSON struct {
-	FioVersion   string `json:"fio version"`
-	GlobalConfig struct {
-		IoEngine string `json:"ioengine"`
-		Direct   string `json:"direct"`
-	} `json:"global options"`
-	Jobs []struct {
-		TestName   string `json:"jobname"`
-		GroupID    int    `json:"groupid"`
-		TestOption struct {
-			RW      string `json:"rw"`
-			BS      string `json:"bs"`
-			IODepth string `json:"iodepth"`
-			NumJobs string `json:"numjobs"`
-			BwLog   string `json:"write_bw_log"`
-			IOPSLog string `json:"write_iops_log"`
-		} `json:"job options"`
-		Read struct {
-			BW       int     `json:"bw"`
-			Iops     float64 `json:"iops"`
-			IoKbs    int     `json:"io_kbytes"`
-			Runtime  int     `json:"runtime"`
-			SlatNS   LatNS   `json:"slat_ns"`
-			ClatNS   LatNS   `json:"clat_ns"`
-			LatNS    LatNS   `json:"lat_ns"`
-			TotalIos int     `json:"total_ios"`
-			IopsMin  int     `json:"iops_min"`
-			IopsMax  int     `json:"iops_max"`
-			IopsMean float64 `json:"iops_mean"`
-			BWMin    int     `json:"bw_min"`
-			BWMax    int     `json:"bw_max"`
-			BWMean   float64 `json:"bw_mean"`
-		} `json:"read"`
-		Write struct {
-			BW       int     `json:"bw"`
-			Iops     float64 `json:"iops"`
-			IoKbs    int     `json:"io_kbytes"`
-			Runtime  int     `json:"runtime"`
-			SlatNS   LatNS   `json:"slat_ns"`
-			ClatNS   LatNS   `json:"clat_ns"`
-			LatNS    LatNS   `json:"lat_ns"`
-			TotalIos int     `json:"total_ios"`
-			IopsMin  int     `json:"iops_min"`
-			IopsMax  int     `json:"iops_max"`
-			IopsMean float64 `json:"iops_mean"`
-			BWMin    int     `json:"bw_min"`
-			BWMax    int     `json:"bw_max"`
-			BWMean   float64 `json:"bw_mean"`
-		} `json:"write"`
-		JobRuntime        int     `json:"job_runtime"`
-		UsrCPU            float64 `json:"usr_cpu"`
-		SysCPU            float64 `json:"sys_cpu"`
-		Ctx               int     `json:"ctx"`
-		LatencyDepth      int     `json:"latency_depth"`
-		LatencyTarget     int     `json:"latency_target"`
-		LatencyPercentile float64 `json:"latency_percentile"`
-	} `json:"jobs"`
-	DiskUtil []struct {
-		DiskName    string  `json:"name"`
-		ReadIos     int     `json:"read_ios"`
-		WriteIos    int     `json:"write_ios"`
-		ReadMerges  int     `json:"read_merges"`
-		WriteMerges int     `json:"write_merges"`
-		ReadTicks   int     `json:"read_ticks"`
-		WriteTicks  int     `json:"write_ticks"`
-		InQueue     int     `json:"in_queue"`
-		Util        float64 `json:"util"`
-	} `json:"disk_util"`
-}
-
-// parseJSON parses JSON input
-func parseJSON(in []byte) (fioJSON, error) {
-	var data fioJSON
-	if err := json.Unmarshal(in, &data); err != nil {
-		return fioJSON{}, fmt.Errorf("invalid JSON input: %w", err)
-	}
-	return data, nil
-}
 
 // toFixed is a helper function for rounding float64
 func toFixed(x float64, n int) float64 {
@@ -115,7 +22,7 @@ func mbps(x int) float64 {
 }
 
 // formatCSV formats CSV input
-func formatCSV(in fioJSON, to io.Writer) error {
+func formatCSV(in bs.FioJSON, to io.Writer) error {
 	var header = []string{
 		"Job Name", "Group ID", "Pattern", "Block Size", "IO Depth", "Jobs",
 		"MB/s", "BWMim (MB/s)", "BWMax (MB/s)", "IOPS min", "IOPS max",
@@ -176,41 +83,16 @@ func formatCSV(in fioJSON, to io.Writer) error {
 	return nil
 }
 
-// cleanJSON removes all another fields from JSON input
-func cleanJSON(in []byte) ([]byte, error) {
-	var begin = bytes.IndexAny(in, "{")
-	var end = bytes.LastIndexAny(in, "}") + 1
-	if begin >= end {
-		return nil, errors.New("incorrect input format")
-	}
-	return in[begin:end], nil
-}
-
 // ConvertJSONtoCSV converts JSON input to CSV file
-func ConvertJSONtoCSV(inputPath, outputPath string) error {
-	data, err := ioutil.ReadFile(inputPath)
-	if err != nil {
-		return fmt.Errorf("could not read file [%s]: %w", inputPath, err)
-	}
-
-	text, err := cleanJSON(data)
-	if err != nil {
-		return fmt.Errorf("could not clean JSON: %w", err)
-	}
-	obj, err := parseJSON(text)
-	if err != nil {
-		return fmt.Errorf("could not parse JSON: %w", err)
-	}
-
+func ConvertJSONtoCSV(fioJSON bs.FioJSON, outputPath string) error {
 	fd, err := os.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("could not create CSV file [%s]: %w", outputPath, err)
 	}
 	defer fd.Close()
 
-	if err := formatCSV(obj, fd); err != nil {
+	if err := formatCSV(fioJSON, fd); err != nil {
 		return fmt.Errorf("could not format CSV: %w", err)
 	}
-
 	return nil
 }
