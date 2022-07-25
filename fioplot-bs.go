@@ -2,16 +2,15 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/jessevdk/go-flags"
 	bar "github.com/vk-en/fioplot-bs/pkg/barchart"
 	csv "github.com/vk-en/fioplot-bs/pkg/csvtable"
-	log "github.com/vk-en/fioplot-bs/pkg/loggraphs"
+//	log "github.com/vk-en/fioplot-bs/pkg/loggraphs"
 	xlsx "github.com/vk-en/fioplot-bs/pkg/xlsxchart"
+	bs "github.com/vk-en/fioplot-bs/pkg/bsdata"
 )
 
 // Options - command line arguments
@@ -24,13 +23,12 @@ type Options struct {
 }
 
 const (
-	version = "0.1.0"
+	version = "1.0.0"
 )
 
 var opts Options
 var parser = flags.NewParser(&opts, flags.Default)
 var pathToResults string
-var jsonFiles []string
 var csvFiles []string
 
 // argparse - parse command line arguments
@@ -69,57 +67,28 @@ func createFolderForResults(folderName string) (string, error) {
 	return fullPath, nil
 }
 
-// checkFolderWithJSONfiles - check if folder with JSON files exists
-func checkFolderWithJSONfiles(pathToJSONfiles string) ([]string, error) {
-	var jsonFilesPath []string
-	files, err := ioutil.ReadDir(pathToJSONfiles)
-	if err != nil {
-		return jsonFilesPath,
-			fmt.Errorf("could not read folder with JSON files: %w", err)
-	}
-
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-		// Here later it will be possible to write check for the first bytes of
-		// the file, this will get rid of the dependency of the .json extension.
-		if strings.Contains(file.Name(), ".json") {
-			jsonFilesPath = append(jsonFilesPath,
-				filepath.Join(pathToJSONfiles, file.Name()))
-		}
-	}
-
-	if len(jsonFilesPath) == 0 {
-		return jsonFilesPath,
-			fmt.Errorf("files with .json extension not found in directory:%s", pathToJSONfiles)
-	}
-
-	return jsonFilesPath, nil
-}
-
 // createCSVTable - create CSV table from JSON file
-func createCSVTable(jsonFilePath, resultsFolder string) (string, error) {
-	var pathToCSVTable string
-
-	csvFolderPath := filepath.Join(resultsFolder, "csv-tables")
+func createCSVTables(allTestInfo bs.AllTestInfo) error {
+	csvFolderPath := filepath.Join(allTestInfo.MainPathToResults, "csv-tables")
 	if _, err := os.Stat(csvFolderPath); os.IsNotExist(err) {
 		if err := os.Mkdir(csvFolderPath, 0755); err != nil {
-			return "", err
+			return err
 		}
 	}
-
-	jsonfileName := filepath.Base(jsonFilePath)
-	// Don't forget to change the line when get rid of the type
-	// dependency for json in the checkFolderWithJSONfiles function
-	csvFileName := strings.Replace(jsonfileName, ".json", ".csv", -1)
-	pathToCSVTable = filepath.Join(csvFolderPath, csvFileName)
-
-	if err := csv.ConvertJSONtoCSV(jsonFilePath, pathToCSVTable); err != nil {
-		return "", err
+	// Create CSV tables for each tests
+	for _, testResults := range allTestInfo.Tests {
+		testResults.CSVFileName = fmt.Sprintf("%s.%s", testResults.TestName, "csv")
+		testResults.CSVFilePath = filepath.Join(csvFolderPath, testResults.CSVFileName)
+		if err := csv.ConvertJSONtoCSV(testResults.JSONResults, testResults.CSVFilePath); err != nil {
+			fmt.Printf("could not create CSV table for file [%s]\n. Error: %v\n",
+						 testResults.TestName, err)
+			continue
+		}
+		// Temporary solution
+		csvFiles = append(csvFiles, filepath.Join(csvFolderPath, testResults.CSVFileName))
 	}
 
-	return pathToCSVTable, nil
+	return nil
 }
 
 // makeResults - create folder with results (xlsx, csv, and BarChars img)
@@ -129,34 +98,34 @@ func makeResults() error {
 		return fmt.Errorf("could not create folder for results: %w", err)
 	}
 
-	if opts.LogGraphs {
+	allResults, err := bs.ReadAllJSONFiles(opts.Catalog)
+	if err != nil {
+		cleanUpDir()
+		return fmt.Errorf("could not read all JSON files: %w", err)
+	}
+
+	allResults.MainPathToResults = pathToResults
+	allResults.PathWithSrcResults = opts.Catalog
+	allResults.ImgFormat = opts.ImgFormat
+	allResults.Description = opts.Description
+
+/* 	if opts.LogGraphs {
 		if err := log.CreateGraphsFromLogs(pathToResults, opts.Catalog, opts.Description, opts.ImgFormat); err != nil {
 			return fmt.Errorf("could not create graphs from logs: %w", err)
 		}
-	}
-
- 	jsonFiles, err = checkFolderWithJSONfiles(opts.Catalog)
-	if err != nil {
-		cleanUpDir()
-		return err
-	}
+	} */
 
 	// Create CSV tables for each JSON file
-	for _, srcFile := range jsonFiles {
-		pathToCSVTable, err := createCSVTable(srcFile, pathToResults)
-		if err != nil {
-			fmt.Printf("could not create CSV table for file [%s]\n. Error: %v\n", srcFile, err)
-			continue
-		}
-		csvFiles = append(csvFiles, pathToCSVTable)
+	if err := createCSVTables(allResults); err != nil {
+		return fmt.Errorf("could not create CSV tables: %w", err)
 	}
 
-	if len(csvFiles) == 0 {
+/* 	if len(csvFiles) == 0 {
 		cleanUpDir()
 		return fmt.Errorf(fmt.Sprintf("%s\n%s\n",
 			"Failed to read FIO results from JSON.",
 			"Results and graphs were not generated =("))
-	}
+	} */
 
 	if err := xlsx.CreateXlsxReport(csvFiles, pathToResults); err != nil {
 		// not a critical error, can move next, just log it

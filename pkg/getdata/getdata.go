@@ -152,7 +152,7 @@ func GetIdenticalPatterns(groups AllResults) ([]string, error) {
 		/* This output of a list of files is necessary to
 		* understand which files we are transferring for
 		* comparison. Sometimes it happens that there
-		*are hidden temporary files in the folder! */
+		* are hidden temporary files in the folder! */
 		for _, result := range group.IOTestResults {
 			uniq[result.Pattern]++
 		}
