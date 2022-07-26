@@ -36,9 +36,9 @@ func formatCSV(in bs.FioJSON, to io.Writer) error {
 	}
 
 	for _, v := range in.Jobs {
-		var bw = v.Write.BW
-		var bwMin = v.Write.BWMin
-		var bwMax = v.Write.BWMax
+		var bw = v.Write.Bw
+		var bwMin = v.Write.BwMin
+		var bwMax = v.Write.BwMax
 		var iopsMin = v.Write.IopsMin
 		var iopsMax = v.Write.IopsMax
 		var latNsMin = float64(v.Write.LatNS.Min) / 1000000
@@ -47,9 +47,9 @@ func formatCSV(in bs.FioJSON, to io.Writer) error {
 		var cLatNsPercent = float64(v.Write.ClatNS.Percentile["99.000000"]) / 1000000
 
 		if v.TestOption.RW == "read" || v.TestOption.RW == "randread" {
-			bw = v.Read.BW
-			bwMin = v.Read.BWMin
-			bwMax = v.Read.BWMax
+			bw = v.Read.Bw
+			bwMin = v.Read.BwMin
+			bwMax = v.Read.BwMax
 			iopsMin = v.Read.IopsMin
 			iopsMax = v.Read.IopsMax
 			latNsMin = float64(v.Read.LatNS.Min) / 1000000
