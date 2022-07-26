@@ -26,7 +26,7 @@ on the results of the performance testing utility - [FIO](https://fio.readthedoc
 
 3. Able to work with log files.
 
-   > In the current version of the program, it is not yet possible to generate graphs for results from different tests with common patterns. But it is possible to turn the log files for bandwich and latency obtained from FIO into visual diagrams for a specific test. This is useful for finding/analyzing/detecting latency and performance spikes.
+   > In the current version of the program, it is not yet possible to generate graphs for results from different tests with common patterns. But it is possible to turn the log files for bandwich and latency obtained from FIO into visual diagrams for a specific test. This is useful for finding/analyzing/detecting latency and performance spikes. Also, there is no support yet for pattern charts with joint randrw/rw loads. Since the resolution of the images has been increased, the time of plotting has also increased.
 
 4. Draws graphs and charts in various formats.
 
@@ -174,6 +174,11 @@ func main() {
     }
 }
 ```
+
+## Problems
+
+- Inaccurate merging of log files, sometimes there is a slight difference between streams in time. It is necessary to implement rounding to the second. For this reason, the data on the graph may not always match the description below it.
+
 
 ## Contributing
 

@@ -8,7 +8,7 @@ import (
 	"github.com/jessevdk/go-flags"
 	bar "github.com/vk-en/fioplot-bs/pkg/barchart"
 	csv "github.com/vk-en/fioplot-bs/pkg/csvtable"
-//	log "github.com/vk-en/fioplot-bs/pkg/loggraphs"
+	log "github.com/vk-en/fioplot-bs/pkg/loggraphs"
 	xlsx "github.com/vk-en/fioplot-bs/pkg/xlsxchart"
 	bs "github.com/vk-en/fioplot-bs/pkg/bsdata"
 )
@@ -98,6 +98,7 @@ func makeResults() error {
 		return fmt.Errorf("could not create folder for results: %w", err)
 	}
 
+	fmt.Println("This process will take some time, please wait...")
 	allResults, err := bs.ReadAllJSONFiles(opts.Catalog)
 	if err != nil {
 		cleanUpDir()
@@ -109,25 +110,25 @@ func makeResults() error {
 	allResults.ImgFormat = opts.ImgFormat
 	allResults.Description = opts.Description
 
-/* 	if opts.LogGraphs {
-		if err := log.CreateGraphsFromLogs(pathToResults, opts.Catalog, opts.Description, opts.ImgFormat); err != nil {
+	if opts.LogGraphs {
+		if err := log.CreateGraphsFromLogs(allResults); err != nil {
 			return fmt.Errorf("could not create graphs from logs: %w", err)
 		}
-	} */
+	}
 
 	// Create CSV tables for each JSON file
-	if err := createCSVTables(allResults); err != nil {
+ 	if err := createCSVTables(allResults); err != nil {
 		return fmt.Errorf("could not create CSV tables: %w", err)
 	}
 
-/* 	if len(csvFiles) == 0 {
+ 	if len(csvFiles) == 0 {
 		cleanUpDir()
 		return fmt.Errorf(fmt.Sprintf("%s\n%s\n",
 			"Failed to read FIO results from JSON.",
 			"Results and graphs were not generated =("))
-	} */
+	}
 
-	if err := xlsx.CreateXlsxReport(csvFiles, pathToResults); err != nil {
+ 	if err := xlsx.CreateXlsxReport(csvFiles, pathToResults); err != nil {
 		// not a critical error, can move next, just log it
 		fmt.Printf("could not create xsls file.\n Error: %v\n", err)
 	}

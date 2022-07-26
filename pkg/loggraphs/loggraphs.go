@@ -15,15 +15,16 @@ import (
 
 	"github.com/wcharczuk/go-chart/v2"
 	"github.com/wcharczuk/go-chart/v2/drawing"
+	bs "github.com/vk-en/fioplot-bs/pkg/bsdata"
 )
 
 const (
 	LogChartWidth = 1920
-	LogChartHeight = 1080
-	LogChartPaddingTop = 80
+	LogChartHeight = 1280
+	LogChartPaddingTop = 110
 	LogChartPaddingLeft = 50
 	LogChartPaddingRight = 50
-	LogChartPaddingBottom = 150
+	LogChartPaddingBottom = 250
 	LogChartIndentLegend = LogChartHeight - LogChartPaddingBottom + 30
 )
 
@@ -123,29 +124,6 @@ func (t *LogFile) parsingLogfile(filePath string) error {
 	return nil
 }
 
-//getInfoAboutLogFile   return: fileType (1-bw,2-iops,3-lat), Y-name, test Name, error
-func getInfoAboutLogFile(fileName string) (int, string, string, error) {
-	testName := strings.Split(fileName, ".")
-	var err error
-
-	bwLog := strings.Contains(fileName, "bw")
-	if bwLog {
-		return 1, "MB/s", testName[0], nil
-	}
-
-	iopsLog := strings.Contains(fileName, "iops")
-	if iopsLog {
-		return 2, "IOPS", testName[0], nil
-	}
-
-	latLog := strings.Contains(fileName, "lat")
-	if latLog {
-		return 3, "msec", testName[0], nil
-	}
-
-	return 0, "", "", err
-}
-
 func styleDefaultsSeries(c *chart.Chart, seriesIndex int) chart.Style {
 	return chart.Style{
 		DotColor:    c.GetColorPalette().GetSeriesColor(seriesIndex),
@@ -157,12 +135,12 @@ func styleDefaultsSeries(c *chart.Chart, seriesIndex int) chart.Style {
 }
 
 // getPoints - Get values for the x-axis
-func getPoints(data LogFile, logType int) ([]float64, []float64) {
+func getPoints(data LogFile, logType bs.LogFileType) ([]float64, []float64) {
 	var xPoints []float64
 	var yPoints []float64
 	for _, point := range data {
 		xPoints = append(xPoints,float64(point.time/1000)) // convert to seconds
-		if logType == 1 {
+		if logType == bs.LOG_TYPE_BW {
 			yPoints = append(yPoints, mbps(point.value))
 		} else {
 			yPoints = append(yPoints, float64(point.value))
@@ -287,47 +265,61 @@ func drawlegend(c *chart.Chart, userDefaults ...chart.Style) chart.Renderable {
 	}
 }
 
+func drawText(r chart.Renderer, yCursor, tx int, fontSize float64, str string, place chart.Box, chartDefaults chart.Style) int {
+	sDefaults := chart.Style{
+		FillColor:   drawing.ColorWhite,
+		FontColor:   chart.DefaultTextColor,
+		FontSize:    fontSize,
+
+		StrokeWidth: 2.0,
+	}
+
+	textStyle := chartDefaults.InheritFrom(sDefaults)
+	textStyle.GetTextOptions().WriteToRenderer(r)
+
+	kb := r.MeasureText(str)
+	ty := yCursor + kb.Height()
+	r.Text(str, tx, ty)
+
+	th2 := kb.Height() >> 1
+	lx := tx + kb.Width() + 15
+	ly := ty - th2
+	lx2 := place.Left - 2
+
+	r.MoveTo(lx, ly)
+	r.LineTo(lx2, ly)
+	yCursor += kb.Height() + 18
+
+	return yCursor
+}
 
 // drawInfo is a legend that is designed for longer series lists.
-func drawInfo(c *chart.Chart, info []string) chart.Renderable {
+func drawInfo(c *chart.Chart, info bs.LogFileInfo) chart.Renderable {
 	return func(r chart.Renderer, cb chart.Box, chartDefaults chart.Style) {
-		if len(info) == 0 {
-			return
-		}
 
 		place := chart.Box{
 			Top: LogChartIndentLegend,
-			Left: 50 + 190,
+			Left: 50 + 220,
 
 		}
-
+		// REWRITE ME PLS
 		ycursor := place.Top
 		tx := place.Left
 
-		for _, str := range info {
-			kb := r.MeasureText(str)
-			ty := ycursor + kb.Height()
-			r.Text(str, tx, ty)
-
-			th2 := kb.Height() >> 1
-			lx := tx + kb.Width() + 10
-			ly := ty - th2
-			lx2 := place.Left - 2
-
-			r.MoveTo(lx, ly)
-			r.LineTo(lx2, ly)
-			ycursor += kb.Height() + 10
-
-		}
+		ycursor = drawText(r, ycursor, tx, 18.0, info.BasicInfoStr, place, chartDefaults)
+		ycursor = drawText(r, ycursor, tx, 18.0, info.TestDescription, place, chartDefaults)
+		ycursor = drawText(r, ycursor, tx, 16.0, info.InfoAboutFio, place, chartDefaults)
+		ycursor = drawText(r, ycursor, tx, 16.0, info.Description, place, chartDefaults)
+		drawText(r, ycursor, tx, 12.0, info.BSInfoString, place, chartDefaults)
 	}
 }
 
 
-func createGraphForLog(data LogFile, logType int, yName, testName, discription, DirResPath, imgFormat string) error {
+func createGraphForLog(data LogFile, logInfo bs.LogFileInfo, testName, discription, imgFormat string) error {
 
-	xVal, YVal := getPoints(data, logType)
+	xVal, YVal := getPoints(data, logInfo.FileType)
 	mainSeries := chart.ContinuousSeries{
-		Name:    yName,
+		Name:    logInfo.YName,
 		YValues: YVal,
 		XValues: xVal,
 	}
@@ -343,7 +335,7 @@ func createGraphForLog(data LogFile, logType int, yName, testName, discription, 
 	graph := chart.Chart{
 		Width: LogChartWidth,
 		Height: LogChartHeight,
-		Title: testName,
+		Title: logInfo.Header,
 		TitleStyle: chart.Style {
 			FontSize:    30.0,
 		},
@@ -362,7 +354,7 @@ func createGraphForLog(data LogFile, logType int, yName, testName, discription, 
 		},
 
 		YAxis: chart.YAxis {
-			Name: yName,
+			Name: logInfo.YName,
 			NameStyle: chart.Style{
 				FontSize:    20.0,
 			},
@@ -378,7 +370,7 @@ func createGraphForLog(data LogFile, logType int, yName, testName, discription, 
 		},
 
 		XAxis: chart.XAxis {
-			Name: "Time in seconds",
+			Name: logInfo.XName,
 			NameStyle: chart.Style{
 				FontSize:    20.0,
 			},
@@ -397,10 +389,10 @@ func createGraphForLog(data LogFile, logType int, yName, testName, discription, 
 
 	graph.Elements = []chart.Renderable{
 		drawlegend(&graph),
-		//drawInfo(&graph, nil), //FIXME: add info
+		drawInfo(&graph, logInfo),
 	}
 
-	logFraphPath := filepath.Join(DirResPath, fmt.Sprintf("%s.%s", testName, imgFormat))
+	logFraphPath := filepath.Join(logInfo.DirForImage, fmt.Sprintf("%s.%s", logInfo.ImgName, imgFormat))
 	f, err := os.Create(logFraphPath)
 	if err != nil {
 		return fmt.Errorf("failed to create file %s error: %w", logFraphPath, err)
@@ -444,7 +436,7 @@ func getCountLineInFile(path string) int {
 	file, _ := os.Open(path)
 	countLine, err := lineCounter(file)
 	if err != nil {
-		fmt.Println("counting line in file failed! error:%w", path, err)
+		fmt.Println("counting line in file failed! file:", path, "error: ", err)
 		return 0
 	}
 	return countLine
@@ -560,31 +552,176 @@ func checkFolderWithLogs(dirWithLogs string) (map[string]string, error) {
 	return folders, nil
 }
 
+func getTetsInfoFromJSON(allTests bs.AllTestInfo, testName string) (bs.TestInfo, error) {
+	for _, test := range allTests.Tests {
+		if test.TestName == testName {
+			return test, nil
+		}
+	}
+	return bs.TestInfo{}, fmt.Errorf("test %s not found in JSON data", testName)
+}
+
+func getJobsFromTestInfo(testInfo bs.TestInfo, fileName, description string) (bs.LogFileInfo, error) {
+	logFinfo := bs.LogFileInfo{}
+	found := false
+
+	for _, job := range testInfo.JSONResults.Jobs {
+		// Here we compare log files that have already been glued together.
+		// This means that there should not be files named like write-64k-8_bw.435.log
+		// The expected filename is something like this: write-64k-8_bw.log
+		// It consists of the name specified in the fio configuration file and
+		// the prefix with the log type
+		switch fileName {
+		case fmt.Sprintf("%s_bw.log", filepath.Base(job.TestOption.BwLog)):
+			found = true
+			logFinfo.FileType = bs.LOG_TYPE_BW
+			logFinfo.YName = "MB/s"
+			logFinfo.Header = fmt.Sprintf("Bandwidth for %s  [test: %s]", job.TestName, testInfo.TestName)
+			logFinfo.ImgName = fmt.Sprintf("bw-%s", filepath.Base(job.TestOption.BwLog))
+			if job.TestOption.RW == "read" || job.TestOption.RW == "randread" {
+				logFinfo.BasicInfoStr = fmt.Sprintf("bw (Kib/s):   min=%d,   max=%d,   avg=%.2f,   stdev=%.2f,   samples=%d",
+							 job.Read.BwMin, job.Read.BwMax, job.Read.BwMean, job.Read.BwDev, job.Read.BwSamples)
+			} else {
+				logFinfo.BasicInfoStr = fmt.Sprintf("bw (Kib/s):   min=%d,   max=%d,   avg=%.2f,   stdev=%.2f,   samples=%d",
+							 job.Write.BwMin, job.Write.BwMax, job.Write.BwMean, job.Write.BwDev, job.Write.BwSamples)
+			}
+		case fmt.Sprintf("%s_iops.log", filepath.Base(job.TestOption.IOPSLog)):
+			found = true
+			logFinfo.FileType = bs.LOG_TYPE_IOPS
+			logFinfo.YName = "IOPS"
+			logFinfo.Header = fmt.Sprintf("IOPS for %s  [test: %s]", job.TestName, testInfo.TestName)
+			logFinfo.ImgName = fmt.Sprintf("iops-%s", filepath.Base(job.TestOption.IOPSLog))
+			if job.TestOption.RW == "read" || job.TestOption.RW == "randread" {
+				logFinfo.BasicInfoStr = fmt.Sprintf("IOPS:   min=%d,   max=%d,   avg=%.2f,   stdev=%.2f,   samples=%d",
+							job.Read.IopsMin, job.Read.IopsMax, job.Read.IopsMean, job.Read.IopsStddev, job.Read.IopsSamples)
+			} else {
+				logFinfo.BasicInfoStr = fmt.Sprintf("IOPS:   min=%d,   max=%d,   avg=%.2f,   stdev=%.2f,   samples=%d",
+							job.Write.IopsMin, job.Write.IopsMax, job.Write.IopsMean, job.Write.IopsStddev, job.Write.IopsSamples)
+			}
+		case fmt.Sprintf("%s_lat.log", filepath.Base(job.TestOption.LatLog)):
+			found = true
+			logFinfo.FileType = bs.LOG_TYPE_LAT
+			logFinfo.YName = "Nanoseconds"
+			logFinfo.Header = fmt.Sprintf("Total latency for %s  [test: %s]", job.TestName, testInfo.TestName)
+			logFinfo.ImgName = fmt.Sprintf("lat-%s", filepath.Base(job.TestOption.LatLog))
+			if job.TestOption.RW == "read" || job.TestOption.RW == "randread" {
+				logFinfo.BasicInfoStr = fmt.Sprintf("lat (nsec):   min=%d,   max=%d,   avg=%.2f,   stdev=%.2f",
+							job.Read.LatNS.Min, job.Read.LatNS.Max, job.Read.LatNS.Mean, job.Read.LatNS.Stddev)
+			} else {
+				logFinfo.BasicInfoStr = fmt.Sprintf("lat (nsec):   min=%d,   max=%d,   avg=%.2f,   stdev=%.2f",
+							job.Write.LatNS.Min, job.Write.LatNS.Max, job.Write.LatNS.Mean, job.Write.LatNS.Stddev)
+			}
+		case fmt.Sprintf("%s_clat.log", filepath.Base(job.TestOption.LatLog)):
+			found = true
+			logFinfo.FileType = bs.LOG_TYPE_CLAT
+			logFinfo.YName = "Nanoseconds"
+			logFinfo.Header = fmt.Sprintf("Completion latency for %s  [test: %s]", job.TestName, testInfo.TestName)
+			logFinfo.ImgName = fmt.Sprintf("clat-%s", filepath.Base(job.TestOption.LatLog))
+			if job.TestOption.RW == "read" || job.TestOption.RW == "randread" {
+				logFinfo.BasicInfoStr = fmt.Sprintf("clat (nsec):   min=%d,   max=%d,   avg=%.2f,   stdev=%.2f",
+							job.Read.ClatNS.Min, job.Read.ClatNS.Max, job.Read.ClatNS.Mean, job.Read.ClatNS.Stddev)
+			} else {
+				logFinfo.BasicInfoStr = fmt.Sprintf("clat (nsec):   min=%d,   max=%d,   avg=%.2f,   stdev=%.2f",
+							job.Write.ClatNS.Min, job.Write.ClatNS.Max, job.Write.ClatNS.Mean, job.Write.ClatNS.Stddev)
+			}
+		case fmt.Sprintf("%s_slat.log", filepath.Base(job.TestOption.LatLog)):
+			found = true
+			logFinfo.FileType = bs.LOG_TYPE_SLAT
+			logFinfo.YName = "Nanoseconds"
+			logFinfo.Header = fmt.Sprintf("Submission latency for %s  [test: %s]", job.TestName, testInfo.TestName)
+			logFinfo.ImgName = fmt.Sprintf("slat-%s", filepath.Base(job.TestOption.LatLog))
+			if job.TestOption.RW == "read" || job.TestOption.RW == "randread" {
+				logFinfo.BasicInfoStr = fmt.Sprintf("slat (nsec):   min=%d,   max=%d,   avg=%.2f,   stdev=%.2f",
+							job.Read.SlatNS.Min, job.Read.SlatNS.Max, job.Read.SlatNS.Mean, job.Read.SlatNS.Stddev)
+			} else {
+				logFinfo.BasicInfoStr = fmt.Sprintf("slat (nsec):   min=%d,   max=%d,   avg=%.2f,   stdev=%.2f",
+							job.Write.SlatNS.Min, job.Write.SlatNS.Max, job.Write.SlatNS.Mean, job.Write.SlatNS.Stddev)
+			}
+		default:
+			continue
+		}
+
+		if found {
+			logFinfo.InfoJobs = &job
+			logFinfo.TestDescription = fmt.Sprintf("job name: %s   |   bs: %s   |   iodepth: %s   |   num jobs: %s   |   rw: %s   |   group ID: %d",
+										 job.TestName, job.TestOption.BS, job.TestOption.IODepth,
+										 job.TestOption.NumJobs, job.TestOption.RW, job.GroupID)
+			logFinfo.XName = "Time line in seconds"
+			logFinfo.InfoAboutFio = fmt.Sprintf("Date: %s   |   version.%s   |   IO engine: %s   |   LogAvgMsec=%s   |   size=%s   | direct=%s",
+										testInfo.JSONResults.Time, testInfo.JSONResults.FioVersion,
+										testInfo.JSONResults.GlobalOptions.Ioengine,
+										testInfo.JSONResults.GlobalOptions.LogAvgMsec,
+										testInfo.JSONResults.GlobalOptions.Size,
+										testInfo.JSONResults.GlobalOptions.Direct)
+			logFinfo.BSInfoString = "Created in fioplot-bs. https://github.com/vk-en/fioplot-bs"
+			logFinfo.Description = fmt.Sprintf("Description: %s", description)
+			return logFinfo, nil
+		}
+	}
+	return logFinfo, fmt.Errorf("no found information in JSON about log file: %s in test: %s",
+					 fileName, testInfo.TestName)
+}
+
+func getFinishDirForGraph(dir string, fType bs.LogFileType) string {
+	// create folder for graph
+	dirName := ""
+	switch fType {
+	case bs.LOG_TYPE_BW:
+		dirName = filepath.Join(dir, "bw")
+	case bs.LOG_TYPE_IOPS:
+		dirName = filepath.Join(dir, "iops")
+	case bs.LOG_TYPE_LAT:
+		dirName = filepath.Join(dir, "lat")
+	case bs.LOG_TYPE_CLAT:
+		dirName = filepath.Join(dir, "clat")
+	case bs.LOG_TYPE_SLAT:
+		dirName = filepath.Join(dir, "slat")
+	default:
+		return dir
+	}
+
+	if _, err := os.Stat(dirName); os.IsNotExist(err) {
+		if err = os.Mkdir(dirName, 0755); err != nil {
+			fmt.Println("Error creating directory for graph: ", err)
+		}
+	}
+	return dirName
+
+}
+
 // CreateGraphsFromLogs - create graphs from logs
-func CreateGraphsFromLogs(dirWithResults, dirWithLogs, discription, ImgFormat string) error {
-	mainResultsAbsDirCharts := filepath.Join(dirWithResults, "log-graphs")
+func CreateGraphsFromLogs(allResults bs.AllTestInfo) error {
+	mainResultsAbsDirCharts := filepath.Join(allResults.MainPathToResults, "log-graphs")
 	if err := os.Mkdir(mainResultsAbsDirCharts, 0755); err != nil {
 		return fmt.Errorf("could not create local dir for result: %w", err)
 	}
 
-	listWithLogsFolders, err := checkFolderWithLogs(dirWithLogs)
+	listWithLogsFolders, err := checkFolderWithLogs(allResults.PathWithSrcResults)
 	if err != nil {
 		return fmt.Errorf("could not check folder with logs %w", err)
 	}
 
 	for testName, pathToLogs := range listWithLogsFolders {
+		testInfo, err := getTetsInfoFromJSON(allResults, testName)
+		if err != nil {
+			fmt.Println("could not get test info %w", err)
+		}
+
+		// main dir for graphs
 		testNameDir := filepath.Join(mainResultsAbsDirCharts, fmt.Sprintf("%s-log-graphs", testName))
 		if err := os.Mkdir(testNameDir, 0755); err != nil {
 			return fmt.Errorf("could not create local dir for result: %w", err)
 		}
 
-		curentLogsAbsDir := filepath.Join(dirWithResults, fmt.Sprintf("%s-GluedLF", testName))
+		// tmp dir for glued logs
+		curentLogsAbsDir := filepath.Join(allResults.MainPathToResults, fmt.Sprintf("%s-GluedLF", testName))
 		err = os.Mkdir(curentLogsAbsDir, 0755)
 		if err != nil {
 			return fmt.Errorf(
 				"could not create tmp dir: %s for result: %s err:%w",
 				curentLogsAbsDir, testName, err)
 		}
+
 		fileWithResultsTmp, err := readDirWithResults(pathToLogs)
 		if err != nil {
 			return fmt.Errorf("could not read dir with log files: %w", err)
@@ -602,13 +739,19 @@ func CreateGraphsFromLogs(dirWithResults, dirWithLogs, discription, ImgFormat st
 		for _, fileName := range gluedFilesWithResults {
 			if !fileName.IsDir() {
 				var logData = make(LogFile, 0)
-				fType, yName, testName, _ := getInfoAboutLogFile(fileName.Name())
+
+				logInfo, err := getJobsFromTestInfo(testInfo, fileName.Name(), allResults.Description)
+				if err != nil {
+					return fmt.Errorf("could not get jobs from test info: %w", err)
+				}
+				logInfo.DirForImage = getFinishDirForGraph(testNameDir, logInfo.FileType)
+
 				if err := logData.parsingLogfile(filepath.Join(curentLogsAbsDir, fileName.Name())); err != nil {
 					return fmt.Errorf("could not parse log file: %w", err)
 				}
 
-				if err := createGraphForLog(logData, fType, yName, testName,
-					discription, testNameDir, ImgFormat); err != nil {
+				if err := createGraphForLog(logData, logInfo, testName,
+					allResults.Description, allResults.ImgFormat); err != nil {
 					return fmt.Errorf("could not create log graphs: %w", err)
 				}
 			}
