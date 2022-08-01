@@ -121,6 +121,10 @@ MyFirstTest/
 
 **Random sample from graph and charts for example:**
 
+<a href="img/bw-example.png"><p align="left"><img width="950" src="img/bw-example.png" alt="fioplot-bs example"></p></a>
+
+<a href="img/slat-example.png"><p align="left"><img width="950" src="img/slat-example.png" alt="fioplot-bs example"></p></a>
+
 <a href="https://svgshare.com/i/ihA.svg"><p align="left"><img width="950" src="https://svgshare.com/i/ihA.svg" alt="fioplot-bs example"></p></a>
 
 You can also see the entire list of available options and commands by running the command:
@@ -178,7 +182,6 @@ func main() {
 ## Problems
 
 - Inaccurate merging of log files, sometimes there is a slight difference between streams in time. It is necessary to implement rounding to the second. For this reason, the data on the graph may not always match the description below it.
-
 
 ## Contributing
 
